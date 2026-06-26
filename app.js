@@ -6,7 +6,6 @@ const state = {
   ojtMinutes: 30,       // 訪問時間（分）
   consultMode: 'online', // online | onsite
   chatHours: 1.0,
-  targetDaysPerWeek: 4,
 };
 
 // --- 定数 ---
@@ -64,14 +63,14 @@ function calcTotals() {
     detail[key] = { n, hoursPerClient, hoursTotal, revenue };
   }
 
-  const maxHoursPerMonth = MAX_DAYS_PER_MONTH * WORK_HOURS_PER_DAY; // 160h
-  const idealHoursPerMonth = IDEAL_DAYS_PER_MONTH * WORK_HOURS_PER_DAY; // 136h
-  const targetHoursPerMonth = state.targetDaysPerWeek * WORK_WEEKS_PER_MONTH * WORK_HOURS_PER_DAY;
+  const maxHoursPerMonth = MAX_DAYS_PER_MONTH * WORK_HOURS_PER_DAY; // 160h（物理的限界）
+  const idealHoursPerMonth = IDEAL_DAYS_PER_MONTH * WORK_HOURS_PER_DAY; // 136h（週休3日）
+  const idealPct = (idealHoursPerMonth / maxHoursPerMonth) * 100; // ≈85%
 
   const requiredDays = Math.ceil(totalHours / WORK_HOURS_PER_DAY);
   const weeksPerDay = (requiredDays / WORK_WEEKS_PER_MONTH).toFixed(1);
 
-  const capacityPct = Math.min((totalHours / maxHoursPerMonth) * 100, 110);
+  const capacityPct = (totalHours / maxHoursPerMonth) * 100;
 
   return {
     totalHours,
@@ -83,7 +82,7 @@ function calcTotals() {
     capacityPct,
     maxHoursPerMonth,
     idealHoursPerMonth,
-    targetHoursPerMonth,
+    idealPct,
   };
 }
 
@@ -101,14 +100,20 @@ function update() {
   document.getElementById('requiredDays').textContent = t.requiredDays + '日/月';
   document.getElementById('weeksInfo').textContent = `週${t.weeksPerDay}日ペース`;
 
-  // ゲージ
-  const pct = Math.min(t.capacityPct, 110);
-  document.getElementById('gaugeFill').style.width = Math.min(pct, 100) + '%';
+  // ゲージ：100% = 物理的限界、理想ライン(週休3日)を縦線で表示
+  const idealPct = t.idealPct; // ≈85%
+  document.getElementById('zoneGreen').style.width = idealPct + '%';
+  document.getElementById('zoneYellow').style.left = idealPct + '%';
+  document.getElementById('zoneYellow').style.width = (100 - idealPct) + '%';
+  document.getElementById('idealMarker').style.left = idealPct + '%';
+
+  const fillWidth = Math.min(t.capacityPct, 100);
+  document.getElementById('gaugeFill').style.width = fillWidth + '%';
   document.getElementById('capacityPercent').textContent = Math.round(t.capacityPct) + '%';
 
-  if (t.capacityPct >= 80) {
-    document.getElementById('gaugeFill').style.background = 'linear-gradient(90deg, #4caf50, #f44336)';
-  } else if (t.capacityPct >= 60) {
+  if (t.capacityPct >= 100) {
+    document.getElementById('gaugeFill').style.background = 'linear-gradient(90deg, #ff9800, #f44336)';
+  } else if (t.capacityPct >= idealPct) {
     document.getElementById('gaugeFill').style.background = 'linear-gradient(90deg, #4caf50, #ff9800)';
   } else {
     document.getElementById('gaugeFill').style.background = 'linear-gradient(90deg, #4caf50, #66bb6a)';
@@ -117,15 +122,15 @@ function update() {
   // メッセージ
   const msg = document.getElementById('capacityMessage');
   const daysPerWeek = (t.requiredDays / WORK_WEEKS_PER_MONTH).toFixed(1);
-  if (t.capacityPct >= 80) {
+  if (t.capacityPct >= 100) {
     msg.className = 'capacity-message over';
-    msg.innerHTML = `🔴 <strong>一人では難しいラインに近づいています</strong><br>月${t.requiredDays}日稼働（週約${daysPerWeek}日）は年120日休みの確保が困難になる可能性があります。`;
-  } else if (t.capacityPct >= 60) {
+    msg.innerHTML = `🔴 <strong>一人では難しいラインに到達しています</strong><br>月${t.requiredDays}日稼働（週約${daysPerWeek}日）。年120日の休みや「連続4勤務以内」の確保が困難になります。増員や契約調整を検討してください。`;
+  } else if (t.capacityPct >= idealPct) {
     msg.className = 'capacity-message warn';
-    msg.innerHTML = `🟡 <strong>週休3日の理想ラインを超えています</strong><br>月${t.requiredDays}日稼働（週約${daysPerWeek}日）です。目標の週4日を超えていないか確認してください。`;
+    msg.innerHTML = `🟡 <strong>週休3日の理想ラインを超えています</strong><br>月${t.requiredDays}日稼働（週約${daysPerWeek}日）。一人で対応は可能ですが、理想の働き方より忙しい状態です。`;
   } else {
     msg.className = 'capacity-message ok';
-    msg.innerHTML = `🟢 <strong>余裕のある稼働です</strong><br>月${t.requiredDays}日稼働（週約${daysPerWeek}日）。週休3日を保ちながら対応できる範囲です。`;
+    msg.innerHTML = `🟢 <strong>週休3日を守れる範囲です</strong><br>月${t.requiredDays}日稼働（週約${daysPerWeek}日）。理想の働き方を保ちながら対応できます。`;
   }
 
   // 内訳テーブル
@@ -287,7 +292,6 @@ function setupEvents() {
 
       if (group === 'ojt') state.ojtMinutes = parseInt(value);
       if (group === 'consult') state.consultMode = value;
-      if (group === 'workdays') state.targetDaysPerWeek = parseInt(value);
 
       update();
     });

@@ -70,15 +70,6 @@
           <div class="range-labels"><span>0h</span><span>5h</span></div>
         </div>
 
-        <div class="setting-item full-width">
-          <label>目標稼働日数</label>
-          <div class="toggle-group">
-            <button class="toggle" data-group="workdays" data-value="3">週3日<small>（週休4日）</small></button>
-            <button class="toggle active" data-group="workdays" data-value="4">週4日<small>（週休3日）</small></button>
-            <button class="toggle" data-group="workdays" data-value="5">週5日<small>（週休2日）</small></button>
-          </div>
-        </div>
-
       </div>
     </section>
 
@@ -111,16 +102,20 @@
           <span id="capacityPercent">15%</span>
         </div>
         <div class="gauge-track">
+          <div class="gauge-zone green" id="zoneGreen"></div>
+          <div class="gauge-zone yellow" id="zoneYellow"></div>
           <div class="gauge-fill" id="gaugeFill"></div>
-          <div class="gauge-zone green" style="left:0;width:60%"></div>
-          <div class="gauge-zone yellow" style="left:60%;width:20%"></div>
-          <div class="gauge-zone red" style="left:80%;width:20%"></div>
-          <div class="gauge-marker" style="left:60%" title="週休3日ライン"></div>
-          <div class="gauge-marker danger" style="left:80%" title="一人では難しいライン"></div>
+          <div class="gauge-marker" id="idealMarker" title="週休3日の理想ライン">
+            <span class="gauge-marker-label">週休3日</span>
+          </div>
+        </div>
+        <div class="gauge-scale">
+          <span>0</span>
+          <span class="scale-limit">物理的限界（週5日）</span>
         </div>
         <div class="gauge-legend">
-          <span class="legend-item green">余裕あり</span>
-          <span class="legend-item yellow">要注意</span>
+          <span class="legend-item green">週休3日を守れる</span>
+          <span class="legend-item yellow">理想を超え、限界に近づく</span>
           <span class="legend-item red">一人では難しい</span>
         </div>
         <div class="capacity-message" id="capacityMessage"></div>

@@ -244,19 +244,19 @@ main {
   height: 24px;
   background: #e0e0e0;
   border-radius: 12px;
-  overflow: hidden;
+  margin-top: 26px;
   margin-bottom: 6px;
 }
 
 .gauge-zone {
   position: absolute;
   top: 0;
+  left: 0;
   height: 100%;
-  opacity: 0.25;
+  opacity: 0.22;
 }
-.gauge-zone.green { background: var(--green); }
-.gauge-zone.yellow { background: var(--yellow); }
-.gauge-zone.red { background: var(--red); }
+.gauge-zone.green { background: var(--green); border-radius: 12px 0 0 12px; }
+.gauge-zone.yellow { background: var(--yellow); border-radius: 0 12px 12px 0; }
 
 .gauge-fill {
   position: absolute;
@@ -271,15 +271,38 @@ main {
 
 .gauge-marker {
   position: absolute;
-  top: 0;
-  height: 100%;
-  width: 3px;
-  background: rgba(0,0,0,0.3);
-  z-index: 3;
+  top: -6px;
+  height: 36px;
+  width: 2px;
+  background: #1a1a1a;
+  z-index: 4;
   transform: translateX(-50%);
 }
 
-.gauge-marker.danger { background: var(--red); }
+.gauge-marker-label {
+  position: absolute;
+  top: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  background: #fff;
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid #1a1a1a;
+}
+
+.gauge-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  color: var(--text-sub);
+  margin-bottom: 12px;
+}
+
+.gauge-scale .scale-limit { color: var(--red); font-weight: 600; }
 
 .gauge-legend {
   display: flex;

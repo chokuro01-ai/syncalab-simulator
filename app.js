@@ -49,6 +49,7 @@ function calcTotals() {
   let totalHours = 0;
   let totalRevenue = 0;
   let totalVisits = 0;
+  let totalConsults = 0;
 
   const detail = {};
   for (const key of ['light', 'standard', 'premium']) {
@@ -60,6 +61,7 @@ function calcTotals() {
     totalHours += hoursTotal;
     totalRevenue += revenue;
     totalVisits += n * p.ojt;
+    totalConsults += n * p.consult;
     detail[key] = { n, hoursPerClient, hoursTotal, revenue };
   }
 
@@ -76,6 +78,7 @@ function calcTotals() {
     totalHours,
     totalRevenue,
     totalVisits,
+    totalConsults,
     detail,
     requiredDays,
     weeksPerDay,
@@ -99,6 +102,8 @@ function update() {
   document.getElementById('dailyHoursAvg').textContent = `平均 ${avgDailyH}時間/日`;
   document.getElementById('requiredDays').textContent = t.requiredDays + '日/月';
   document.getElementById('weeksInfo').textContent = `週${t.weeksPerDay}日ペース`;
+  document.getElementById('totalVisits').textContent = t.totalVisits + '件';
+  document.getElementById('totalConsults').textContent = t.totalConsults + '枠';
 
   // ゲージ：100% = 物理的限界、理想ライン(週休3日)を縦線で表示
   const idealPct = t.idealPct; // ≈85%
@@ -193,9 +198,9 @@ function renderCalendar(t) {
   `;
   wrap.appendChild(legend);
 
-  // 曜日ヘッダー
-  const days = ['日', '月', '火', '水', '木', '金', '土'];
-  const classes = ['sun', '', '', '', '', '', 'sat'];
+  // 曜日ヘッダー（月曜始まり）
+  const days = ['月', '火', '水', '木', '金', '土', '日'];
+  const classes = ['', '', '', '', '', 'sat', 'sun'];
   days.forEach((d, i) => {
     const h = document.createElement('div');
     h.className = 'cal-header ' + classes[i];
@@ -203,9 +208,11 @@ function renderCalendar(t) {
     wrap.appendChild(h);
   });
 
-  // 2026年7月を基準に（日曜始まり、1日は水曜）
-  const startDow = 3; // 2026/7/1は水曜
+  // 2026年7月を基準に（月曜始まり、1日は水曜）
+  const startDow = 3; // 2026/7/1は水曜（0=日,1=月,...,6=土）
   const totalDays = 31;
+  // 月曜始まりグリッドでの列オフセット（月=0列目）
+  const startOffset = (startDow + 6) % 7;
 
   // 訪問スケジュール生成（連続4勤務以内）
   const totalVisits = t.totalVisits;
@@ -236,8 +243,8 @@ function renderCalendar(t) {
     consultDays.add(remainingDays[Math.floor(i * cStep)]);
   }
 
-  // 空白セル（月初の曜日オフセット）
-  for (let i = 0; i < startDow; i++) {
+  // 空白セル（月初の曜日オフセット・月曜始まり）
+  for (let i = 0; i < startOffset; i++) {
     const empty = document.createElement('div');
     empty.className = 'cal-day empty';
     wrap.appendChild(empty);

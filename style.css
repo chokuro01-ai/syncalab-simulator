@@ -195,10 +195,13 @@ main {
 
 .result-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 16px;
   margin-bottom: 24px;
 }
+
+.result-box.visits .result-value { color: var(--blue-light); }
+.result-box.consults .result-value { color: var(--orange); }
 
 .result-box {
   background: white;

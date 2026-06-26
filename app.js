@@ -199,18 +199,112 @@ function renderBreakdown(t) {
   `;
 }
 
+// ===== カレンダー（ドラッグで配置できるチップ式） =====
+const CAL = {
+  startDow: 3,    // 2026/7/1は水曜（0=日,1=月,...,6=土）
+  totalDays: 31,
+  maxPerDay: 4,   // 1日に並べられるチップ上限
+  storageKey: 'syncalab-cal-placement-v1',
+};
+
+// placement: { [day]: ['ojt'|'consult', ...] }
+let calPlacement = null;
+let calCounts = { ojt: null, consult: null };
+
+// 稼働日（週末除外・連続4勤務以内）を返す
+function calWorkDays() {
+  const days = [];
+  let consecutive = 0;
+  for (let d = 1; d <= CAL.totalDays; d++) {
+    const dow = (CAL.startDow + d - 1) % 7;
+    const isWeekend = dow === 0 || dow === 6;
+    if (isWeekend) { consecutive = 0; continue; }
+    if (consecutive >= MAX_CONSECUTIVE_DAYS) { consecutive = 0; continue; }
+    days.push(d);
+    consecutive++;
+  }
+  return days;
+}
+
+// 初期自動配置（OJT・コンサルを稼働日に均等割り付け、1日最大4つ）
+function autoPlace(totalVisits, totalConsults) {
+  const workDays = calWorkDays();
+  const placement = {};
+  workDays.forEach(d => { placement[d] = []; });
+  const placeEven = (count, type) => {
+    if (count <= 0 || workDays.length === 0) return;
+    const stepN = workDays.length / count;
+    for (let i = 0; i < count; i++) {
+      const startIdx = Math.floor(i * stepN) % workDays.length;
+      for (let k = 0; k < workDays.length; k++) {
+        const d = workDays[(startIdx + k) % workDays.length];
+        if (placement[d].length < CAL.maxPerDay) { placement[d].push(type); break; }
+      }
+    }
+  };
+  placeEven(totalVisits, 'ojt');
+  placeEven(totalConsults, 'consult');
+  return placement;
+}
+
+function loadPlacement() {
+  try {
+    const raw = localStorage.getItem(CAL.storageKey);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) { return null; }
+}
+
+function savePlacement() {
+  try {
+    localStorage.setItem(CAL.storageKey, JSON.stringify({
+      ojt: calCounts.ojt, consult: calCounts.consult, placement: calPlacement,
+    }));
+  } catch (e) { /* ストレージ不可でも続行 */ }
+}
+
+// 件数に応じて配置を用意（初回は保存から復元、件数が変わったら自動再配置）
+function ensurePlacement(totalVisits, totalConsults) {
+  if (calPlacement === null) {
+    const saved = loadPlacement();
+    if (saved && saved.ojt === totalVisits && saved.consult === totalConsults) {
+      calPlacement = saved.placement;
+      calCounts = { ojt: totalVisits, consult: totalConsults };
+      return;
+    }
+  }
+  if (calPlacement === null || calCounts.ojt !== totalVisits || calCounts.consult !== totalConsults) {
+    calPlacement = autoPlace(totalVisits, totalConsults);
+    calCounts = { ojt: totalVisits, consult: totalConsults };
+    savePlacement();
+  }
+}
+
+// チップを fromDay の idx番目 → toDay へ移動
+function moveChip(fromDay, idx, toDay) {
+  fromDay = String(fromDay); toDay = String(toDay);
+  if (!calPlacement[fromDay]) return false;
+  const chip = calPlacement[fromDay][idx];
+  if (chip === undefined) return false;
+  if (!calPlacement[toDay]) calPlacement[toDay] = [];
+  if (toDay !== fromDay && calPlacement[toDay].length >= CAL.maxPerDay) return false;
+  calPlacement[fromDay].splice(idx, 1);
+  calPlacement[toDay].push(chip);
+  savePlacement();
+  return true;
+}
+
 function renderCalendar(t) {
   const wrap = document.getElementById('calendarWrap');
+  ensurePlacement(t.totalVisits, t.totalConsults);
   wrap.innerHTML = '';
 
-  // 凡例
+  // 凡例（緑＝同日は廃止）
   const legend = document.createElement('div');
   legend.className = 'cal-legend';
   legend.style.gridColumn = '1 / -1';
   legend.innerHTML = `
     <div class="cal-legend-item"><div class="cal-legend-dot" style="background:#e3f2fd;border:1px solid #4a90c4"></div>OJT訪問</div>
     <div class="cal-legend-item"><div class="cal-legend-dot" style="background:#fff3e0;border:1px solid #e8683a"></div>コンサル</div>
-    <div class="cal-legend-item"><div class="cal-legend-dot" style="background:#e8f5e9;border:1px solid #4caf50"></div>OJT＋コンサル同日</div>
     <div class="cal-legend-item"><div class="cal-legend-dot" style="background:#fce4ec"></div>休日</div>
   `;
   wrap.appendChild(legend);
@@ -225,66 +319,82 @@ function renderCalendar(t) {
     wrap.appendChild(h);
   });
 
-  // 2026年7月を基準に（月曜始まり、1日は水曜）
-  const startDow = 3; // 2026/7/1は水曜（0=日,1=月,...,6=土）
-  const totalDays = 31;
-  // 月曜始まりグリッドでの列オフセット（月=0列目）
-  const startOffset = (startDow + 6) % 7;
-
-  // 訪問スケジュール生成（連続4勤務以内）
-  const totalVisits = t.totalVisits;
-  const totalConsults = Object.entries(t.detail).reduce((acc, [k, d]) => acc + d.n * PLANS[k].consult, 0);
-
-  // 稼働日を生成（週5日ベース、連続4まで）
-  const workDays = [];
-  let consecutive = 0;
-  for (let d = 1; d <= totalDays; d++) {
-    const dow = (startDow + d - 1) % 7;
-    const isWeekend = dow === 0 || dow === 6;
-    if (isWeekend) { consecutive = 0; continue; }
-    if (consecutive >= MAX_CONSECUTIVE_DAYS) { consecutive = 0; continue; }
-    workDays.push(d);
-    consecutive++;
-  }
-
-  // 訪問日を均等に割り付け
-  const visitDays = new Set();
-  const consultDays = new Set();
-  const step = workDays.length / Math.max(totalVisits, 1);
-  for (let i = 0; i < Math.min(totalVisits, workDays.length); i++) {
-    visitDays.add(workDays[Math.floor(i * step)]);
-  }
-  const remainingDays = workDays.filter(d => !visitDays.has(d));
-  const cStep = remainingDays.length / Math.max(totalConsults - totalVisits, 1);
-  for (let i = 0; i < Math.min(Math.max(totalConsults - totalVisits, 0), remainingDays.length); i++) {
-    consultDays.add(remainingDays[Math.floor(i * cStep)]);
-  }
-
-  // 空白セル（月初の曜日オフセット・月曜始まり）
+  // 月初の曜日オフセット（月曜始まり）
+  const startOffset = (CAL.startDow + 6) % 7;
   for (let i = 0; i < startOffset; i++) {
     const empty = document.createElement('div');
     empty.className = 'cal-day empty';
     wrap.appendChild(empty);
   }
 
-  for (let d = 1; d <= totalDays; d++) {
-    const dow = (startDow + d - 1) % 7;
+  for (let d = 1; d <= CAL.totalDays; d++) {
+    const dow = (CAL.startDow + d - 1) % 7;
     const isWeekend = dow === 0 || dow === 6;
-    const isOjt = visitDays.has(d);
-    const isConsult = consultDays.has(d);
+    const chips = calPlacement[d] || [];
 
     const cell = document.createElement('div');
-    let cls = 'cal-day';
-    let label = '';
-    if (isWeekend) { cls += ' holiday'; }
-    else if (isOjt && isConsult) { cls += ' both'; label = 'OJT＋相談'; }
-    else if (isOjt) { cls += ' ojt'; label = 'OJT'; }
-    else if (isConsult) { cls += ' consult'; label = '相談'; }
+    cell.className = 'cal-day' + (isWeekend ? ' holiday' : '');
+    cell.dataset.day = d;
 
-    cell.className = cls;
-    cell.innerHTML = `<span class="cal-date">${d}</span>${label ? `<span class="cal-label">${label}</span>` : ''}`;
+    const chipsHtml = chips.map((type, idx) =>
+      `<div class="chip ${type}" data-day="${d}" data-idx="${idx}">${type === 'ojt' ? 'OJT' : 'コンサル'}</div>`
+    ).join('');
+
+    cell.innerHTML = `<span class="cal-date">${d}</span><div class="cal-chips">${chipsHtml}</div>`;
     wrap.appendChild(cell);
   }
+}
+
+// ドラッグ配置（マウス・タッチ両対応：ポインターイベント）
+function setupCalendarDrag() {
+  const wrap = document.getElementById('calendarWrap');
+  let drag = null;
+
+  wrap.addEventListener('pointerdown', (e) => {
+    const chip = e.target.closest('.chip');
+    if (!chip) return;
+    e.preventDefault();
+
+    const clone = chip.cloneNode(true);
+    clone.classList.add('chip-dragging');
+    document.body.appendChild(clone);
+    const place = (x, y) => { clone.style.left = x + 'px'; clone.style.top = y + 'px'; };
+    place(e.clientX, e.clientY);
+    chip.classList.add('chip-source');
+
+    drag = { fromDay: chip.dataset.day, idx: parseInt(chip.dataset.idx), clone, place };
+
+    const clearTargets = () =>
+      document.querySelectorAll('.cal-day.drop-target').forEach(c => c.classList.remove('drop-target'));
+
+    const onMove = (ev) => {
+      drag.place(ev.clientX, ev.clientY);
+      const under = document.elementFromPoint(ev.clientX, ev.clientY);
+      const cell = under && under.closest ? under.closest('.cal-day') : null;
+      clearTargets();
+      if (cell && cell.dataset.day && !cell.classList.contains('empty')) {
+        const cur = (calPlacement[cell.dataset.day] || []).length;
+        if (cell.dataset.day === drag.fromDay || cur < CAL.maxPerDay) cell.classList.add('drop-target');
+      }
+    };
+
+    const onUp = (ev) => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      const under = document.elementFromPoint(ev.clientX, ev.clientY);
+      const cell = under && under.closest ? under.closest('.cal-day') : null;
+      drag.clone.remove();
+      clearTargets();
+      if (cell && cell.dataset.day && !cell.classList.contains('empty')) {
+        moveChip(drag.fromDay, drag.idx, cell.dataset.day);
+      }
+      drag = null;
+      update(); // 再描画
+    };
+
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  });
 }
 
 // --- イベント設定 ---
@@ -326,4 +436,5 @@ function setupEvents() {
 
 // --- 初期化 ---
 setupEvents();
+setupCalendarDrag();
 update();

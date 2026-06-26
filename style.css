@@ -401,27 +401,64 @@ main {
 .cal-header.sat { color: #1565c0; }
 
 .cal-day {
-  aspect-ratio: 1;
   border-radius: 6px;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  align-items: stretch;
   font-size: 0.72rem;
-  background: #f5f5f5;
+  background: #fafafa;
   border: 1px solid #e0e0e0;
-  padding: 2px;
-  min-height: 44px;
+  padding: 3px;
+  min-height: 84px;
 }
 
-.cal-day.holiday { background: #fce4ec; color: #c62828; }
-.cal-day.ojt { background: #e3f2fd; border-color: var(--blue-light); }
-.cal-day.consult { background: #fff3e0; border-color: var(--orange); }
-.cal-day.both { background: #e8f5e9; border-color: var(--green); }
-.cal-day.empty { background: transparent; border: none; }
+.cal-day.holiday { background: #fdeef2; }
+.cal-day.holiday .cal-date { color: #c62828; }
+.cal-day.empty { background: transparent; border: none; min-height: 0; }
 
-.cal-date { font-weight: 600; font-size: 0.8rem; }
-.cal-label { font-size: 0.6rem; color: var(--text-sub); line-height: 1.2; text-align: center; }
+.cal-day.drop-target {
+  outline: 2px dashed var(--orange);
+  outline-offset: -2px;
+  background: #fff7f3;
+}
+
+.cal-date { font-weight: 600; font-size: 0.8rem; text-align: center; }
+
+.cal-chips {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 3px;
+}
+
+.chip {
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-align: center;
+  border-radius: 4px;
+  padding: 3px 2px;
+  border: 1px solid;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  line-height: 1.1;
+}
+
+.chip.ojt { background: #e3f2fd; color: #1565c0; border-color: var(--blue-light); }
+.chip.consult { background: #fff3e0; color: #e65100; border-color: var(--orange); }
+.chip:active { cursor: grabbing; }
+.chip.chip-source { opacity: 0.35; }
+
+.chip-dragging {
+  position: fixed;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  z-index: 1000;
+  min-width: 64px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+  cursor: grabbing;
+}
 
 .calendar-note {
   font-size: 0.78rem;
@@ -464,5 +501,7 @@ footer {
   header h1 { font-size: 1.3rem; }
   .result-value { font-size: 1.4rem; }
   #calendarWrap { gap: 2px; }
-  .cal-day { font-size: 0.62rem; min-height: 38px; }
+  .cal-day { font-size: 0.58rem; min-height: 70px; padding: 2px; }
+  .cal-date { font-size: 0.68rem; }
+  .chip { font-size: 0.54rem; padding: 2px 1px; }
 }

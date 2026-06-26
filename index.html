@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SynCa Lab 稼働シミュレーター</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>SynCa Lab<span class="accent">C</span> 稼働シミュレーター</h1>
+    <p class="subtitle">契約先の組み合わせから、月の実働と月商をシミュレートします</p>
+  </header>
+
+  <main>
+    <!-- 契約数入力 -->
+    <section class="card">
+      <h2>契約先の数</h2>
+      <div class="plan-inputs">
+        <div class="plan-row">
+          <div class="plan-label light">ライトプラン<span class="price">30,000円/月</span></div>
+          <div class="slider-wrap">
+            <input type="range" id="lightCount" min="0" max="20" value="3" step="1">
+            <span class="count-display" id="lightDisplay">3</span> 事業所
+          </div>
+        </div>
+        <div class="plan-row">
+          <div class="plan-label standard">スタンダードプラン<span class="price">60,000円/月</span></div>
+          <div class="slider-wrap">
+            <input type="range" id="standardCount" min="0" max="20" value="2" step="1">
+            <span class="count-display" id="standardDisplay">2</span> 事業所
+          </div>
+        </div>
+        <div class="plan-row">
+          <div class="plan-label premium">プレミアムプラン<span class="price">100,000円/月</span></div>
+          <div class="slider-wrap">
+            <input type="range" id="premiumCount" min="0" max="10" value="1" step="1">
+            <span class="count-display" id="premiumDisplay">1</span> 事業所
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 時間設定 -->
+    <section class="card">
+      <h2>時間設定 <span class="tag">調整可</span></h2>
+      <div class="settings-grid">
+
+        <div class="setting-item">
+          <label>OJT訪問時間</label>
+          <div class="toggle-group">
+            <button class="toggle active" data-group="ojt" data-value="30">30分</button>
+            <button class="toggle" data-group="ojt" data-value="60">60分</button>
+          </div>
+          <p class="setting-note">移動往復80分を含めた実働：<strong id="ojtTimeDisplay">1.8時間</strong>/回</p>
+        </div>
+
+        <div class="setting-item">
+          <label>コンサル枠の形式</label>
+          <div class="toggle-group">
+            <button class="toggle active" data-group="consult" data-value="online">オンライン</button>
+            <button class="toggle" data-group="consult" data-value="onsite">現地</button>
+          </div>
+          <p class="setting-note">1枠あたり実働：<strong id="consultTimeDisplay">0.5時間</strong></p>
+        </div>
+
+        <div class="setting-item full-width">
+          <label>チャット対応（1事業所あたり/月）<strong id="chatTimeDisplay">1.0</strong>時間</label>
+          <input type="range" id="chatTime" min="0" max="5" value="1.0" step="0.5" style="width:100%">
+          <div class="range-labels"><span>0h</span><span>5h</span></div>
+        </div>
+
+        <div class="setting-item full-width">
+          <label>目標稼働日数</label>
+          <div class="toggle-group">
+            <button class="toggle" data-group="workdays" data-value="3">週3日<small>（週休4日）</small></button>
+            <button class="toggle active" data-group="workdays" data-value="4">週4日<small>（週休3日）</small></button>
+            <button class="toggle" data-group="workdays" data-value="5">週5日<small>（週休2日）</small></button>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- 結果サマリー -->
+    <section class="card result-card">
+      <h2>シミュレーション結果</h2>
+
+      <div class="result-grid">
+        <div class="result-box revenue">
+          <div class="result-label">月商</div>
+          <div class="result-value" id="monthlyRevenue">¥290,000</div>
+          <div class="result-sub" id="annualRevenue">年商 ¥3,480,000</div>
+        </div>
+        <div class="result-box hours">
+          <div class="result-label">月の総実働時間</div>
+          <div class="result-value" id="monthlyHours">38.0時間</div>
+          <div class="result-sub" id="dailyHoursAvg">平均 2.2時間/日</div>
+        </div>
+        <div class="result-box days">
+          <div class="result-label">必要稼働日数（推計）</div>
+          <div class="result-value" id="requiredDays">5日/月</div>
+          <div class="result-sub" id="weeksInfo">週1.1日ペース</div>
+        </div>
+      </div>
+
+      <!-- キャパシティゲージ -->
+      <div class="capacity-section">
+        <div class="capacity-header">
+          <span>キャパシティ</span>
+          <span id="capacityPercent">15%</span>
+        </div>
+        <div class="gauge-track">
+          <div class="gauge-fill" id="gaugeFill"></div>
+          <div class="gauge-zone green" style="left:0;width:60%"></div>
+          <div class="gauge-zone yellow" style="left:60%;width:20%"></div>
+          <div class="gauge-zone red" style="left:80%;width:20%"></div>
+          <div class="gauge-marker" style="left:60%" title="週休3日ライン"></div>
+          <div class="gauge-marker danger" style="left:80%" title="一人では難しいライン"></div>
+        </div>
+        <div class="gauge-legend">
+          <span class="legend-item green">余裕あり</span>
+          <span class="legend-item yellow">要注意</span>
+          <span class="legend-item red">一人では難しい</span>
+        </div>
+        <div class="capacity-message" id="capacityMessage"></div>
+      </div>
+    </section>
+
+    <!-- 内訳テーブル -->
+    <section class="card">
+      <h2>プラン別 内訳</h2>
+      <table class="breakdown-table">
+        <thead>
+          <tr>
+            <th>プラン</th>
+            <th>件数</th>
+            <th>OJT訪問/月</th>
+            <th>コンサル枠/月</th>
+            <th>チャット/月</th>
+            <th>小計（時間）</th>
+            <th>売上</th>
+          </tr>
+        </thead>
+        <tbody id="breakdownBody"></tbody>
+        <tfoot id="breakdownFoot"></tfoot>
+      </table>
+    </section>
+
+    <!-- 月間スケジュールイメージ -->
+    <section class="card">
+      <h2>月間スケジュールイメージ</h2>
+      <div id="calendarWrap"></div>
+      <p class="calendar-note">※ 訪問日の配置はイメージです。連続4勤務以内で均等配置した場合の目安です。</p>
+    </section>
+
+  </main>
+
+  <footer>
+    <p>SynCa Lab 内部ツール｜数値はすべて概算です</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

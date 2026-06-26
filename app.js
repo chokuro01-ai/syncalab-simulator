@@ -203,13 +203,20 @@ function renderBreakdown(t) {
 const CAL = {
   startDow: 3,    // 2026/7/1は水曜（0=日,1=月,...,6=土）
   totalDays: 31,
-  maxPerDay: 4,   // 1日に並べられるチップ上限
-  storageKey: 'syncalab-cal-placement-v1',
+  maxPerDay: 4,   // 1日のスロット数（並べられる上限）
+  storageKey: 'syncalab-cal-placement-v2',
 };
 
-// placement: { [day]: ['ojt'|'consult', ...] }
+// placement: { [day]: ['ojt'|'consult'|null × 4] }（スロット位置を保持）
 let calPlacement = null;
 let calCounts = { ojt: null, consult: null };
+
+// 長さ4（空きはnull）に正規化
+function ensureLen4(arr) {
+  for (let i = 0; i < CAL.maxPerDay; i++) if (arr[i] === undefined) arr[i] = null;
+  arr.length = CAL.maxPerDay;
+  return arr;
+}
 
 // 稼働日（週末除外・連続4勤務以内）を返す
 function calWorkDays() {
@@ -226,11 +233,11 @@ function calWorkDays() {
   return days;
 }
 
-// 初期自動配置（OJT・コンサルを稼働日に均等割り付け、1日最大4つ）
+// 初期自動配置（OJT・コンサルを稼働日に均等割り付け、空きスロットの先頭へ）
 function autoPlace(totalVisits, totalConsults) {
   const workDays = calWorkDays();
   const placement = {};
-  workDays.forEach(d => { placement[d] = []; });
+  workDays.forEach(d => { placement[d] = [null, null, null, null]; });
   const placeEven = (count, type) => {
     if (count <= 0 || workDays.length === 0) return;
     const stepN = workDays.length / count;
@@ -238,7 +245,8 @@ function autoPlace(totalVisits, totalConsults) {
       const startIdx = Math.floor(i * stepN) % workDays.length;
       for (let k = 0; k < workDays.length; k++) {
         const d = workDays[(startIdx + k) % workDays.length];
-        if (placement[d].length < CAL.maxPerDay) { placement[d].push(type); break; }
+        const slot = placement[d].indexOf(null);
+        if (slot !== -1) { placement[d][slot] = type; break; }
       }
     }
   };
@@ -279,16 +287,20 @@ function ensurePlacement(totalVisits, totalConsults) {
   }
 }
 
-// チップを fromDay の idx番目 → toDay へ移動
-function moveChip(fromDay, idx, toDay) {
+// チップを (fromDay, fromSlot) → (toDay, toSlot) へ移動。空きなら配置、埋まっていれば入れ替え
+function moveChip(fromDay, fromSlot, toDay, toSlot) {
   fromDay = String(fromDay); toDay = String(toDay);
+  fromSlot = Number(fromSlot); toSlot = Number(toSlot);
   if (!calPlacement[fromDay]) return false;
-  const chip = calPlacement[fromDay][idx];
-  if (chip === undefined) return false;
-  if (!calPlacement[toDay]) calPlacement[toDay] = [];
-  if (toDay !== fromDay && calPlacement[toDay].length >= CAL.maxPerDay) return false;
-  calPlacement[fromDay].splice(idx, 1);
-  calPlacement[toDay].push(chip);
+  ensureLen4(calPlacement[fromDay]);
+  const chip = calPlacement[fromDay][fromSlot];
+  if (!chip) return false;
+  if (fromDay === toDay && fromSlot === toSlot) return false;
+  if (!calPlacement[toDay]) calPlacement[toDay] = [null, null, null, null];
+  ensureLen4(calPlacement[toDay]);
+  const target = calPlacement[toDay][toSlot]; // 入れ替え相手（空きならnull）
+  calPlacement[toDay][toSlot] = chip;
+  calPlacement[fromDay][fromSlot] = target || null;
   savePlacement();
   return true;
 }
@@ -330,17 +342,21 @@ function renderCalendar(t) {
   for (let d = 1; d <= CAL.totalDays; d++) {
     const dow = (CAL.startDow + d - 1) % 7;
     const isWeekend = dow === 0 || dow === 6;
-    const chips = calPlacement[d] || [];
+    const slots = calPlacement[d] || [];
 
     const cell = document.createElement('div');
     cell.className = 'cal-day' + (isWeekend ? ' holiday' : '');
     cell.dataset.day = d;
 
-    const chipsHtml = chips.map((type, idx) =>
-      `<div class="chip ${type}" data-day="${d}" data-idx="${idx}">${type === 'ojt' ? 'OJT' : 'コンサル'}</div>`
-    ).join('');
+    let slotsHtml = '';
+    for (let s = 0; s < CAL.maxPerDay; s++) {
+      const type = slots[s];
+      slotsHtml += `<div class="cal-slot${type ? '' : ' empty-slot'}" data-day="${d}" data-slot="${s}">` +
+        (type ? `<div class="chip ${type}" data-day="${d}" data-slot="${s}">${type === 'ojt' ? 'OJT' : 'コンサル'}</div>` : '') +
+        `</div>`;
+    }
 
-    cell.innerHTML = `<span class="cal-date">${d}</span><div class="cal-chips">${chipsHtml}</div>`;
+    cell.innerHTML = `<span class="cal-date">${d}</span><div class="cal-chips">${slotsHtml}</div>`;
     wrap.appendChild(cell);
   }
 }
@@ -362,31 +378,31 @@ function setupCalendarDrag() {
     place(e.clientX, e.clientY);
     chip.classList.add('chip-source');
 
-    drag = { fromDay: chip.dataset.day, idx: parseInt(chip.dataset.idx), clone, place };
+    drag = { fromDay: chip.dataset.day, fromSlot: chip.dataset.slot, clone, place };
 
     const clearTargets = () =>
-      document.querySelectorAll('.cal-day.drop-target').forEach(c => c.classList.remove('drop-target'));
+      document.querySelectorAll('.cal-slot.drop-target').forEach(c => c.classList.remove('drop-target'));
+
+    const slotUnder = (x, y) => {
+      const under = document.elementFromPoint(x, y);
+      return under && under.closest ? under.closest('.cal-slot') : null;
+    };
 
     const onMove = (ev) => {
       drag.place(ev.clientX, ev.clientY);
-      const under = document.elementFromPoint(ev.clientX, ev.clientY);
-      const cell = under && under.closest ? under.closest('.cal-day') : null;
       clearTargets();
-      if (cell && cell.dataset.day && !cell.classList.contains('empty')) {
-        const cur = (calPlacement[cell.dataset.day] || []).length;
-        if (cell.dataset.day === drag.fromDay || cur < CAL.maxPerDay) cell.classList.add('drop-target');
-      }
+      const slot = slotUnder(ev.clientX, ev.clientY);
+      if (slot && slot.dataset.day) slot.classList.add('drop-target');
     };
 
     const onUp = (ev) => {
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
-      const under = document.elementFromPoint(ev.clientX, ev.clientY);
-      const cell = under && under.closest ? under.closest('.cal-day') : null;
+      const slot = slotUnder(ev.clientX, ev.clientY);
       drag.clone.remove();
       clearTargets();
-      if (cell && cell.dataset.day && !cell.classList.contains('empty')) {
-        moveChip(drag.fromDay, drag.idx, cell.dataset.day);
+      if (slot && slot.dataset.day) {
+        moveChip(drag.fromDay, drag.fromSlot, slot.dataset.day, slot.dataset.slot);
       }
       drag = null;
       update(); // 再描画

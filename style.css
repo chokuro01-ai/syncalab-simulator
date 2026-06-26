@@ -409,18 +409,12 @@ main {
   background: #fafafa;
   border: 1px solid #e0e0e0;
   padding: 3px;
-  min-height: 84px;
+  min-height: 100px;
 }
 
 .cal-day.holiday { background: #fdeef2; }
 .cal-day.holiday .cal-date { color: #c62828; }
 .cal-day.empty { background: transparent; border: none; min-height: 0; }
-
-.cal-day.drop-target {
-  outline: 2px dashed var(--orange);
-  outline-offset: -2px;
-  background: #fff7f3;
-}
 
 .cal-date { font-weight: 600; font-size: 0.8rem; text-align: center; }
 
@@ -431,18 +425,36 @@ main {
   margin-top: 3px;
 }
 
+.cal-slot {
+  min-height: 17px;
+  border-radius: 4px;
+  display: flex;
+}
+
+.cal-slot.empty-slot {
+  border: 1px dashed #dcdcdc;
+  background: rgba(0,0,0,0.015);
+}
+
+.cal-slot.drop-target {
+  outline: 2px dashed var(--orange);
+  outline-offset: -1px;
+  background: #fff2ea;
+}
+
 .chip {
+  flex: 1;
   font-size: 0.62rem;
   font-weight: 700;
   text-align: center;
   border-radius: 4px;
-  padding: 3px 2px;
+  padding: 2px 2px;
   border: 1px solid;
   cursor: grab;
   user-select: none;
   -webkit-user-select: none;
   touch-action: none;
-  line-height: 1.1;
+  line-height: 1.2;
 }
 
 .chip.ojt { background: #e3f2fd; color: #1565c0; border-color: var(--blue-light); }
@@ -501,7 +513,8 @@ footer {
   header h1 { font-size: 1.3rem; }
   .result-value { font-size: 1.4rem; }
   #calendarWrap { gap: 2px; }
-  .cal-day { font-size: 0.58rem; min-height: 70px; padding: 2px; }
+  .cal-day { font-size: 0.58rem; min-height: 86px; padding: 2px; }
   .cal-date { font-size: 0.68rem; }
-  .chip { font-size: 0.54rem; padding: 2px 1px; }
+  .cal-slot { min-height: 15px; }
+  .chip { font-size: 0.54rem; padding: 1px; }
 }

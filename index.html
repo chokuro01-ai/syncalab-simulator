@@ -52,17 +52,16 @@
             <button class="toggle active" data-group="ojt" data-value="30">30分</button>
             <button class="toggle" data-group="ojt" data-value="60">60分</button>
           </div>
-          <p class="setting-note">移動往復<strong id="travelDisplay">60</strong>分を含めた実働：<strong id="ojtTimeDisplay">1.5時間</strong>/回</p>
+          <p class="setting-note">移動往復<strong id="ojtTravelDisplay">60</strong>分を含めた実働：<strong id="ojtTimeDisplay">1.5時間</strong>/回</p>
         </div>
 
         <div class="setting-item">
-          <label>往復移動時間（1回あたり）</label>
+          <label>OJT 往復移動時間（1回あたり）</label>
           <div class="toggle-group">
-            <button class="toggle active" data-group="travel" data-value="60">60分</button>
-            <button class="toggle" data-group="travel" data-value="90">90分</button>
-            <button class="toggle" data-group="travel" data-value="120">120分</button>
+            <button class="toggle active" data-group="ojtTravel" data-value="60">60分</button>
+            <button class="toggle" data-group="ojtTravel" data-value="90">90分</button>
+            <button class="toggle" data-group="ojtTravel" data-value="120">120分</button>
           </div>
-          <p class="setting-note">OJT訪問・現地コンサルに共通で適用</p>
         </div>
 
         <div class="setting-item">
@@ -72,6 +71,16 @@
             <button class="toggle" data-group="consult" data-value="onsite">現地</button>
           </div>
           <p class="setting-note">1枠あたり実働：<strong id="consultTimeDisplay">0.5時間</strong></p>
+        </div>
+
+        <div class="setting-item" id="consultTravelItem" style="display:none">
+          <label>コンサル 往復移動時間（1回あたり）</label>
+          <div class="toggle-group">
+            <button class="toggle active" data-group="consultTravel" data-value="60">60分</button>
+            <button class="toggle" data-group="consultTravel" data-value="90">90分</button>
+            <button class="toggle" data-group="consultTravel" data-value="120">120分</button>
+          </div>
+          <p class="setting-note">現地コンサル選択時のみ適用</p>
         </div>
 
         <div class="setting-item full-width">

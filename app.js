@@ -3,9 +3,10 @@ const state = {
   light: 3,
   standard: 2,
   premium: 1,
-  ojtMinutes: 30,       // 訪問時間（分）
-  travelMinutes: 60,    // 往復移動時間（分）60 | 90 | 120
-  consultMode: 'online', // online | onsite
+  ojtMinutes: 30,            // 訪問時間（分）
+  ojtTravelMinutes: 60,      // OJT往復移動時間（分）60 | 90 | 120
+  consultTravelMinutes: 60,  // コンサル往復移動時間（分）60 | 90 | 120
+  consultMode: 'online',     // online | onsite
   chatHours: 1.0,
 };
 
@@ -31,12 +32,12 @@ const GAUGE_MAX_DAYS = Math.round(6 * WORK_WEEKS_PER_MONTH);
 // --- 計算ロジック ---
 function calcOjtHours() {
   const visitMin = state.ojtMinutes;
-  return (state.travelMinutes + visitMin) / 60;
+  return (state.ojtTravelMinutes + visitMin) / 60;
 }
 
 function calcConsultHours() {
   if (state.consultMode === 'online') return 0.5;
-  return (state.travelMinutes + 30) / 60;
+  return (state.consultTravelMinutes + 30) / 60;
 }
 
 function calcPlanHours(planKey) {
@@ -157,9 +158,12 @@ function update() {
   renderCalendar(t);
 
   // 設定表示更新
-  document.getElementById('travelDisplay').textContent = state.travelMinutes;
+  document.getElementById('ojtTravelDisplay').textContent = state.ojtTravelMinutes;
   document.getElementById('ojtTimeDisplay').textContent = calcOjtHours().toFixed(1) + '時間';
   document.getElementById('consultTimeDisplay').textContent = calcConsultHours().toFixed(1) + '時間';
+  // コンサル往復移動トグルは「現地」選択時のみ表示
+  document.getElementById('consultTravelItem').style.display =
+    state.consultMode === 'onsite' ? '' : 'none';
 }
 
 function renderBreakdown(t) {
@@ -311,7 +315,8 @@ function setupEvents() {
       btn.classList.add('active');
 
       if (group === 'ojt') state.ojtMinutes = parseInt(value);
-      if (group === 'travel') state.travelMinutes = parseInt(value);
+      if (group === 'ojtTravel') state.ojtTravelMinutes = parseInt(value);
+      if (group === 'consultTravel') state.consultTravelMinutes = parseInt(value);
       if (group === 'consult') state.consultMode = value;
 
       update();

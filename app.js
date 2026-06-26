@@ -4,6 +4,7 @@ const state = {
   standard: 2,
   premium: 1,
   ojtMinutes: 30,       // 訪問時間（分）
+  travelMinutes: 60,    // 往復移動時間（分）60 | 90 | 120
   consultMode: 'online', // online | onsite
   chatHours: 1.0,
 };
@@ -15,26 +16,27 @@ const PLANS = {
   premium:  { name: 'プレミアムプラン',  price: 100000, ojt: 4, consult: 4, cls: 'premium' },
 };
 
-const TRAVEL_BOTH_WAYS = 80; // 分（往復）
 const WORK_HOURS_PER_DAY = 8;
 const WORK_WEEKS_PER_MONTH = 4.33;
 const MAX_CONSECUTIVE_DAYS = 4;
 
 // キャパシティ上限（月稼働日数）
 // 年120日休み → 年245日稼働 → 月平均20.4日
-const MAX_DAYS_PER_MONTH = 20;
+const MAX_DAYS_PER_MONTH = 20;       // 週5日（物理的限界）
 // 週休3日理想 → 週4日 × 4.33週 ≈ 17日/月
 const IDEAL_DAYS_PER_MONTH = Math.round(4 * WORK_WEEKS_PER_MONTH);
+// ゲージ右側の余白（赤ゾーンを見せるため限界の先まで表示）：週6日相当
+const GAUGE_MAX_DAYS = Math.round(6 * WORK_WEEKS_PER_MONTH);
 
 // --- 計算ロジック ---
 function calcOjtHours() {
   const visitMin = state.ojtMinutes;
-  return (TRAVEL_BOTH_WAYS + visitMin) / 60;
+  return (state.travelMinutes + visitMin) / 60;
 }
 
 function calcConsultHours() {
   if (state.consultMode === 'online') return 0.5;
-  return (TRAVEL_BOTH_WAYS + 30) / 60;
+  return (state.travelMinutes + 30) / 60;
 }
 
 function calcPlanHours(planKey) {
@@ -65,14 +67,19 @@ function calcTotals() {
     detail[key] = { n, hoursPerClient, hoursTotal, revenue };
   }
 
-  const maxHoursPerMonth = MAX_DAYS_PER_MONTH * WORK_HOURS_PER_DAY; // 160h（物理的限界）
-  const idealHoursPerMonth = IDEAL_DAYS_PER_MONTH * WORK_HOURS_PER_DAY; // 136h（週休3日）
-  const idealPct = (idealHoursPerMonth / maxHoursPerMonth) * 100; // ≈85%
+  const maxHoursPerMonth = MAX_DAYS_PER_MONTH * WORK_HOURS_PER_DAY;   // 160h（週5＝物理的限界）
+  const idealHoursPerMonth = IDEAL_DAYS_PER_MONTH * WORK_HOURS_PER_DAY; // 136h（週4＝週休3日）
+  const gaugeMaxHours = GAUGE_MAX_DAYS * WORK_HOURS_PER_DAY;          // 208h（週6相当・ゲージ右端）
 
   const requiredDays = Math.ceil(totalHours / WORK_HOURS_PER_DAY);
   const weeksPerDay = (requiredDays / WORK_WEEKS_PER_MONTH).toFixed(1);
 
+  // 限界（週5）に対する割合：%表示・判定に使う
   const capacityPct = (totalHours / maxHoursPerMonth) * 100;
+  // ゲージ上の位置（右端=週6相当）
+  const week4TrackPct = (idealHoursPerMonth / gaugeMaxHours) * 100; // ≈65%
+  const week5TrackPct = (maxHoursPerMonth / gaugeMaxHours) * 100;   // ≈77%
+  const fillTrackPct = Math.min((totalHours / gaugeMaxHours) * 100, 100);
 
   return {
     totalHours,
@@ -85,7 +92,9 @@ function calcTotals() {
     capacityPct,
     maxHoursPerMonth,
     idealHoursPerMonth,
-    idealPct,
+    week4TrackPct,
+    week5TrackPct,
+    fillTrackPct,
   };
 }
 
@@ -105,37 +114,40 @@ function update() {
   document.getElementById('totalVisits').textContent = t.totalVisits + '件';
   document.getElementById('totalConsults').textContent = t.totalConsults + '枠';
 
-  // ゲージ：100% = 物理的限界、理想ライン(週休3日)を縦線で表示
-  const idealPct = t.idealPct; // ≈85%
-  document.getElementById('zoneGreen').style.width = idealPct + '%';
-  document.getElementById('zoneYellow').style.left = idealPct + '%';
-  document.getElementById('zoneYellow').style.width = (100 - idealPct) + '%';
-  document.getElementById('idealMarker').style.left = idealPct + '%';
+  // ゲージ：🟢〜週4日 / 🟡週4〜週5 / 🔴週5超（週6相当が右端）
+  const w4 = t.week4TrackPct; // ≈65%
+  const w5 = t.week5TrackPct; // ≈77%
+  document.getElementById('zoneGreen').style.width = w4 + '%';
+  document.getElementById('zoneYellow').style.left = w4 + '%';
+  document.getElementById('zoneYellow').style.width = (w5 - w4) + '%';
+  document.getElementById('zoneRed').style.left = w5 + '%';
+  document.getElementById('zoneRed').style.width = (100 - w5) + '%';
+  document.getElementById('idealMarker').style.left = w4 + '%';
+  document.getElementById('limitMarker').style.left = w5 + '%';
 
-  const fillWidth = Math.min(t.capacityPct, 100);
-  document.getElementById('gaugeFill').style.width = fillWidth + '%';
+  document.getElementById('gaugeFill').style.width = t.fillTrackPct + '%';
   document.getElementById('capacityPercent').textContent = Math.round(t.capacityPct) + '%';
 
   if (t.capacityPct >= 100) {
     document.getElementById('gaugeFill').style.background = 'linear-gradient(90deg, #ff9800, #f44336)';
-  } else if (t.capacityPct >= idealPct) {
+  } else if (t.capacityPct >= 85) {
     document.getElementById('gaugeFill').style.background = 'linear-gradient(90deg, #4caf50, #ff9800)';
   } else {
     document.getElementById('gaugeFill').style.background = 'linear-gradient(90deg, #4caf50, #66bb6a)';
   }
 
-  // メッセージ
+  // メッセージ（85%≒週4、100%＝週5）
   const msg = document.getElementById('capacityMessage');
   const daysPerWeek = (t.requiredDays / WORK_WEEKS_PER_MONTH).toFixed(1);
   if (t.capacityPct >= 100) {
     msg.className = 'capacity-message over';
-    msg.innerHTML = `🔴 <strong>一人では難しいラインに到達しています</strong><br>月${t.requiredDays}日稼働（週約${daysPerWeek}日）。年120日の休みや「連続4勤務以内」の確保が困難になります。増員や契約調整を検討してください。`;
-  } else if (t.capacityPct >= idealPct) {
+    msg.innerHTML = `🔴 <strong>週5日（物理的限界）を超えています</strong><br>月${t.requiredDays}日稼働（週約${daysPerWeek}日）。年120日の休みや「連続4勤務以内」の確保が困難です。増員や契約調整を検討してください。`;
+  } else if (t.capacityPct >= 85) {
     msg.className = 'capacity-message warn';
-    msg.innerHTML = `🟡 <strong>週休3日の理想ラインを超えています</strong><br>月${t.requiredDays}日稼働（週約${daysPerWeek}日）。一人で対応は可能ですが、理想の働き方より忙しい状態です。`;
+    msg.innerHTML = `🟡 <strong>週4日（週休3日）を超え、限界に近づいています</strong><br>月${t.requiredDays}日稼働（週約${daysPerWeek}日）。一人で対応は可能ですが、理想より忙しい状態です。`;
   } else {
     msg.className = 'capacity-message ok';
-    msg.innerHTML = `🟢 <strong>週休3日を守れる範囲です</strong><br>月${t.requiredDays}日稼働（週約${daysPerWeek}日）。理想の働き方を保ちながら対応できます。`;
+    msg.innerHTML = `🟢 <strong>週休3日を守れる範囲です（週4日以内）</strong><br>月${t.requiredDays}日稼働（週約${daysPerWeek}日）。理想の働き方を保ちながら対応できます。`;
   }
 
   // 内訳テーブル
@@ -145,6 +157,7 @@ function update() {
   renderCalendar(t);
 
   // 設定表示更新
+  document.getElementById('travelDisplay').textContent = state.travelMinutes;
   document.getElementById('ojtTimeDisplay').textContent = calcOjtHours().toFixed(1) + '時間';
   document.getElementById('consultTimeDisplay').textContent = calcConsultHours().toFixed(1) + '時間';
 }
@@ -298,6 +311,7 @@ function setupEvents() {
       btn.classList.add('active');
 
       if (group === 'ojt') state.ojtMinutes = parseInt(value);
+      if (group === 'travel') state.travelMinutes = parseInt(value);
       if (group === 'consult') state.consultMode = value;
 
       update();

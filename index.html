@@ -52,7 +52,17 @@
             <button class="toggle active" data-group="ojt" data-value="30">30分</button>
             <button class="toggle" data-group="ojt" data-value="60">60分</button>
           </div>
-          <p class="setting-note">移動往復80分を含めた実働：<strong id="ojtTimeDisplay">1.8時間</strong>/回</p>
+          <p class="setting-note">移動往復<strong id="travelDisplay">60</strong>分を含めた実働：<strong id="ojtTimeDisplay">1.5時間</strong>/回</p>
+        </div>
+
+        <div class="setting-item">
+          <label>往復移動時間（1回あたり）</label>
+          <div class="toggle-group">
+            <button class="toggle active" data-group="travel" data-value="60">60分</button>
+            <button class="toggle" data-group="travel" data-value="90">90分</button>
+            <button class="toggle" data-group="travel" data-value="120">120分</button>
+          </div>
+          <p class="setting-note">OJT訪問・現地コンサルに共通で適用</p>
         </div>
 
         <div class="setting-item">
@@ -114,19 +124,23 @@
         <div class="gauge-track">
           <div class="gauge-zone green" id="zoneGreen"></div>
           <div class="gauge-zone yellow" id="zoneYellow"></div>
+          <div class="gauge-zone red" id="zoneRed"></div>
           <div class="gauge-fill" id="gaugeFill"></div>
-          <div class="gauge-marker" id="idealMarker" title="週休3日の理想ライン">
-            <span class="gauge-marker-label">週休3日</span>
+          <div class="gauge-marker" id="idealMarker" title="週4日（週休3日）ライン">
+            <span class="gauge-marker-label">週4日</span>
+          </div>
+          <div class="gauge-marker danger" id="limitMarker" title="週5日（物理的限界）ライン">
+            <span class="gauge-marker-label danger">週5日</span>
           </div>
         </div>
         <div class="gauge-scale">
           <span>0</span>
-          <span class="scale-limit">物理的限界（週5日）</span>
+          <span></span>
         </div>
         <div class="gauge-legend">
-          <span class="legend-item green">週休3日を守れる</span>
-          <span class="legend-item yellow">理想を超え、限界に近づく</span>
-          <span class="legend-item red">一人では難しい</span>
+          <span class="legend-item green">週休3日を守れる（〜週4日）</span>
+          <span class="legend-item yellow">限界に近づく（週4〜週5）</span>
+          <span class="legend-item red">一人では難しい（週5超）</span>
         </div>
         <div class="capacity-message" id="capacityMessage"></div>
       </div>

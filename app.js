@@ -207,16 +207,19 @@ function renderBreakdown(t) {
 const CAL = {
   startDow: 3,    // 2026/7/1は水曜（0=日,1=月,...,6=土）
   totalDays: 31,
-  maxPerDay: 4,   // 1日のスロット数（並べられる上限）
-  storageKey: 'syncalab-cal-placement-v2',
+  maxPerDay: 5,   // 1日のスロット数（並べられる上限）
+  storageKey: 'syncalab-cal-placement-v3',
 };
 
-// placement: { [day]: ['ojt'|'consult'|null × 4] }（スロット位置を保持）
+// placement: { [day]: ['ojt'|'consult'|'chat'|null × maxPerDay] }（スロット位置を保持）
 let calPlacement = null;
-let calCounts = { ojt: null, consult: null };
+let calCounts = { ojt: null, consult: null, chat: null };
 
-// 長さ4（空きはnull）に正規化
-function ensureLen4(arr) {
+// 空スロット配列を生成
+function newSlots() { return new Array(CAL.maxPerDay).fill(null); }
+
+// 長さ maxPerDay（空きはnull）に正規化
+function ensureSlots(arr) {
   for (let i = 0; i < CAL.maxPerDay; i++) if (arr[i] === undefined) arr[i] = null;
   arr.length = CAL.maxPerDay;
   return arr;
@@ -237,11 +240,13 @@ function calWorkDays() {
   return days;
 }
 
-// 初期自動配置（OJT・コンサルを稼働日に均等割り付け、空きスロットの先頭へ）
-function autoPlace(totalVisits, totalConsults) {
+// 初期自動配置（チャットは毎稼働日、OJT・コンサルは均等割り付け、空きスロットの先頭へ）
+function autoPlace(totalVisits, totalConsults, hasChat) {
   const workDays = calWorkDays();
   const placement = {};
-  workDays.forEach(d => { placement[d] = [null, null, null, null]; });
+  workDays.forEach(d => { placement[d] = newSlots(); });
+  // チャット：毎稼働日に1つ（先頭スロット）
+  if (hasChat) workDays.forEach(d => { placement[d][0] = 'chat'; });
   const placeEven = (count, type) => {
     if (count <= 0 || workDays.length === 0) return;
     const stepN = workDays.length / count;
@@ -269,24 +274,24 @@ function loadPlacement() {
 function savePlacement() {
   try {
     localStorage.setItem(CAL.storageKey, JSON.stringify({
-      ojt: calCounts.ojt, consult: calCounts.consult, placement: calPlacement,
+      ojt: calCounts.ojt, consult: calCounts.consult, chat: calCounts.chat, placement: calPlacement,
     }));
   } catch (e) { /* ストレージ不可でも続行 */ }
 }
 
 // 件数に応じて配置を用意（初回は保存から復元、件数が変わったら自動再配置）
-function ensurePlacement(totalVisits, totalConsults) {
+function ensurePlacement(totalVisits, totalConsults, chatCount) {
   if (calPlacement === null) {
     const saved = loadPlacement();
-    if (saved && saved.ojt === totalVisits && saved.consult === totalConsults) {
+    if (saved && saved.ojt === totalVisits && saved.consult === totalConsults && saved.chat === chatCount) {
       calPlacement = saved.placement;
-      calCounts = { ojt: totalVisits, consult: totalConsults };
+      calCounts = { ojt: totalVisits, consult: totalConsults, chat: chatCount };
       return;
     }
   }
-  if (calPlacement === null || calCounts.ojt !== totalVisits || calCounts.consult !== totalConsults) {
-    calPlacement = autoPlace(totalVisits, totalConsults);
-    calCounts = { ojt: totalVisits, consult: totalConsults };
+  if (calPlacement === null || calCounts.ojt !== totalVisits || calCounts.consult !== totalConsults || calCounts.chat !== chatCount) {
+    calPlacement = autoPlace(totalVisits, totalConsults, chatCount > 0);
+    calCounts = { ojt: totalVisits, consult: totalConsults, chat: chatCount };
     savePlacement();
   }
 }
@@ -296,12 +301,12 @@ function moveChip(fromDay, fromSlot, toDay, toSlot) {
   fromDay = String(fromDay); toDay = String(toDay);
   fromSlot = Number(fromSlot); toSlot = Number(toSlot);
   if (!calPlacement[fromDay]) return false;
-  ensureLen4(calPlacement[fromDay]);
+  ensureSlots(calPlacement[fromDay]);
   const chip = calPlacement[fromDay][fromSlot];
   if (!chip) return false;
   if (fromDay === toDay && fromSlot === toSlot) return false;
-  if (!calPlacement[toDay]) calPlacement[toDay] = [null, null, null, null];
-  ensureLen4(calPlacement[toDay]);
+  if (!calPlacement[toDay]) calPlacement[toDay] = newSlots();
+  ensureSlots(calPlacement[toDay]);
   const target = calPlacement[toDay][toSlot]; // 入れ替え相手（空きならnull）
   calPlacement[toDay][toSlot] = chip;
   calPlacement[fromDay][fromSlot] = target || null;
@@ -311,28 +316,29 @@ function moveChip(fromDay, fromSlot, toDay, toSlot) {
 
 function renderCalendar(t) {
   const wrap = document.getElementById('calendarWrap');
-  ensurePlacement(t.totalVisits, t.totalConsults);
+
+  // チャット対応：月合計を稼働日数で割り、1チップあたりの目安（分/日）を表示
+  const workDaysArr = calWorkDays();
+  const perDayChatMin = workDaysArr.length > 0 ? Math.round(t.totalChatHours * 60 / workDaysArr.length) : 0;
+  const chatLabel = perDayChatMin >= 60
+    ? `チャット 約${(perDayChatMin / 60).toFixed(1)}h`
+    : `チャット 約${perDayChatMin}分`;
+  const chatCount = (t.totalChatHours > 0) ? workDaysArr.length : 0; // チャットチップ数（毎稼働日に1つ）
+
+  ensurePlacement(t.totalVisits, t.totalConsults, chatCount);
   wrap.innerHTML = '';
 
-  // 凡例（緑＝同日は廃止）
+  // 凡例
   const legend = document.createElement('div');
   legend.className = 'cal-legend';
   legend.style.gridColumn = '1 / -1';
   legend.innerHTML = `
     <div class="cal-legend-item"><div class="cal-legend-dot" style="background:#e3f2fd;border:1px solid #4a90c4"></div>OJT訪問</div>
     <div class="cal-legend-item"><div class="cal-legend-dot" style="background:#fff3e0;border:1px solid #e8683a"></div>コンサル</div>
-    <div class="cal-legend-item"><div class="cal-legend-dot" style="background:#e8f5e9;border:1px solid #43a047"></div>チャット（毎稼働日）</div>
+    <div class="cal-legend-item"><div class="cal-legend-dot" style="background:#e8f5e9;border:1px solid #43a047"></div>チャット</div>
     <div class="cal-legend-item"><div class="cal-legend-dot" style="background:#fce4ec"></div>休日</div>
   `;
   wrap.appendChild(legend);
-
-  // チャット対応：月合計を稼働日数で割り、毎稼働日の目安（分/日）を表示
-  const workDaysArr = calWorkDays();
-  const workSet = new Set(workDaysArr);
-  const perDayChatMin = workDaysArr.length > 0 ? Math.round(t.totalChatHours * 60 / workDaysArr.length) : 0;
-  const chatLabel = perDayChatMin >= 60
-    ? `チャット 約${(perDayChatMin / 60).toFixed(1)}h`
-    : `チャット 約${perDayChatMin}分`;
 
   // 曜日ヘッダー（月曜始まり）
   const days = ['月', '火', '水', '木', '金', '土', '日'];
@@ -361,20 +367,16 @@ function renderCalendar(t) {
     cell.className = 'cal-day' + (isWeekend ? ' holiday' : '');
     cell.dataset.day = d;
 
+    const chipText = { ojt: 'OJT', consult: 'コンサル', chat: chatLabel };
     let slotsHtml = '';
     for (let s = 0; s < CAL.maxPerDay; s++) {
       const type = slots[s];
       slotsHtml += `<div class="cal-slot${type ? '' : ' empty-slot'}" data-day="${d}" data-slot="${s}">` +
-        (type ? `<div class="chip ${type}" data-day="${d}" data-slot="${s}">${type === 'ojt' ? 'OJT' : 'コンサル'}</div>` : '') +
+        (type ? `<div class="chip ${type}" data-day="${d}" data-slot="${s}">${chipText[type]}</div>` : '') +
         `</div>`;
     }
 
-    // チャット帯（稼働日のみ・固定表示・ドラッグ不可）
-    const chatHtml = (workSet.has(d) && perDayChatMin > 0)
-      ? `<div class="cal-chat">${chatLabel}</div>`
-      : '';
-
-    cell.innerHTML = `<span class="cal-date">${d}</span>${chatHtml}<div class="cal-chips">${slotsHtml}</div>`;
+    cell.innerHTML = `<span class="cal-date">${d}</span><div class="cal-chips">${slotsHtml}</div>`;
     wrap.appendChild(cell);
   }
 }

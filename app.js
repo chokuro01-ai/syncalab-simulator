@@ -68,6 +68,9 @@ function calcTotals() {
     detail[key] = { n, hoursPerClient, hoursTotal, revenue };
   }
 
+  const totalBusinesses = counts.light + counts.standard + counts.premium;
+  const totalChatHours = state.chatHours * totalBusinesses; // 月のチャット合計時間
+
   const maxHoursPerMonth = MAX_DAYS_PER_MONTH * WORK_HOURS_PER_DAY;   // 160h（週5＝物理的限界）
   const idealHoursPerMonth = IDEAL_DAYS_PER_MONTH * WORK_HOURS_PER_DAY; // 136h（週4＝週休3日）
   const gaugeMaxHours = GAUGE_MAX_DAYS * WORK_HOURS_PER_DAY;          // 208h（週6相当・ゲージ右端）
@@ -87,6 +90,7 @@ function calcTotals() {
     totalRevenue,
     totalVisits,
     totalConsults,
+    totalChatHours,
     detail,
     requiredDays,
     weeksPerDay,
@@ -317,9 +321,18 @@ function renderCalendar(t) {
   legend.innerHTML = `
     <div class="cal-legend-item"><div class="cal-legend-dot" style="background:#e3f2fd;border:1px solid #4a90c4"></div>OJT訪問</div>
     <div class="cal-legend-item"><div class="cal-legend-dot" style="background:#fff3e0;border:1px solid #e8683a"></div>コンサル</div>
+    <div class="cal-legend-item"><div class="cal-legend-dot" style="background:#e8f5e9;border:1px solid #43a047"></div>チャット（毎稼働日）</div>
     <div class="cal-legend-item"><div class="cal-legend-dot" style="background:#fce4ec"></div>休日</div>
   `;
   wrap.appendChild(legend);
+
+  // チャット対応：月合計を稼働日数で割り、毎稼働日の目安（分/日）を表示
+  const workDaysArr = calWorkDays();
+  const workSet = new Set(workDaysArr);
+  const perDayChatMin = workDaysArr.length > 0 ? Math.round(t.totalChatHours * 60 / workDaysArr.length) : 0;
+  const chatLabel = perDayChatMin >= 60
+    ? `チャット 約${(perDayChatMin / 60).toFixed(1)}h`
+    : `チャット 約${perDayChatMin}分`;
 
   // 曜日ヘッダー（月曜始まり）
   const days = ['月', '火', '水', '木', '金', '土', '日'];
@@ -356,7 +369,12 @@ function renderCalendar(t) {
         `</div>`;
     }
 
-    cell.innerHTML = `<span class="cal-date">${d}</span><div class="cal-chips">${slotsHtml}</div>`;
+    // チャット帯（稼働日のみ・固定表示・ドラッグ不可）
+    const chatHtml = (workSet.has(d) && perDayChatMin > 0)
+      ? `<div class="cal-chat">${chatLabel}</div>`
+      : '';
+
+    cell.innerHTML = `<span class="cal-date">${d}</span>${chatHtml}<div class="cal-chips">${slotsHtml}</div>`;
     wrap.appendChild(cell);
   }
 }

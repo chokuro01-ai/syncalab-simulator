@@ -418,6 +418,21 @@ main {
 
 .cal-date { font-weight: 600; font-size: 0.8rem; text-align: center; }
 
+.cal-chat {
+  margin-top: 3px;
+  font-size: 0.58rem;
+  font-weight: 700;
+  text-align: center;
+  color: #2e7d32;
+  background: #e8f5e9;
+  border: 1px solid #43a047;
+  border-radius: 4px;
+  padding: 2px 1px;
+  line-height: 1.25;
+  word-break: keep-all;
+  overflow-wrap: normal;
+}
+
 .cal-chips {
   display: flex;
   flex-direction: column;
